@@ -21,6 +21,7 @@ import superAffiliateVideoRoutes from "./routes/superAffiliateVideoRoutes.js";
 import masterAffiliateVideoRoutes from "./routes/masterAffiliateVideoRoutes.js";
 import promotionRoutes from "./routes/promotionRoutes.js";
 import socialLinksRoutes from "./routes/socialLinksRoutes.js";
+import categoryRoutes from "./routes/categoryRoutes.js"
 
 dotenv.config();
 const app = express();
@@ -55,6 +56,7 @@ app.use("/api/super-affiliate-video", superAffiliateVideoRoutes);
 app.use("/api/master-affiliate-video", masterAffiliateVideoRoutes);
 app.use('/api/promotions', promotionRoutes);
 app.use('/api/social-links', socialLinksRoutes);
+app.use("/api/categories", categoryRoutes);
 
 // Test route
 app.get("/", (req, res) => {
