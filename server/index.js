@@ -22,6 +22,7 @@ import masterAffiliateVideoRoutes from "./routes/masterAffiliateVideoRoutes.js";
 import promotionRoutes from "./routes/promotionRoutes.js";
 import socialLinksRoutes from "./routes/socialLinksRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js"
+import callBackRoutes from "./routes/callBackRoutes.js"
 
 dotenv.config();
 const app = express();
@@ -57,6 +58,7 @@ app.use("/api/master-affiliate-video", masterAffiliateVideoRoutes);
 app.use('/api/promotions', promotionRoutes);
 app.use('/api/social-links', socialLinksRoutes);
 app.use("/api/categories", categoryRoutes);
+app.use("/api/callback-data-game", callBackRoutes); // এই লাইনটা থাকলেই হবে
 
 // Test route
 app.get("/", (req, res) => {

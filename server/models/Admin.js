@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import gameHistory from "./GameHistory.js"
 
 const adminSchema = new mongoose.Schema(
   {
@@ -30,6 +31,7 @@ const adminSchema = new mongoose.Schema(
     gameLossCommissionBalance: { type: Number, default: 0 },
     depositCommissionBalance: { type: Number, default: 0 },
     referCommissionBalance : { type: Number, default: 0 },
+    gameHistory:[gameHistory],
 
     pendingRequests: {
       type: [mongoose.Schema.Types.ObjectId],
