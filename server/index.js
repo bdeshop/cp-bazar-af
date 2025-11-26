@@ -21,8 +21,9 @@ import superAffiliateVideoRoutes from "./routes/superAffiliateVideoRoutes.js";
 import masterAffiliateVideoRoutes from "./routes/masterAffiliateVideoRoutes.js";
 import promotionRoutes from "./routes/promotionRoutes.js";
 import socialLinksRoutes from "./routes/socialLinksRoutes.js";
-import categoryRoutes from "./routes/categoryRoutes.js"
-import callBackRoutes from "./routes/callBackRoutes.js"
+import categoryRoutes from "./routes/categoryRoutes.js";
+import callBackRoutes from "./routes/callBackRoutes.js";
+import balanceTransferRoutes from "./routes/balanceTransferRoutes.js";
 
 dotenv.config();
 const app = express();
@@ -55,10 +56,11 @@ app.use("/api/site-settings", siteSettingsRoutes);
 app.use("/api/admin-site-settings", AdminSiteSettingsRoutes);
 app.use("/api/super-affiliate-video", superAffiliateVideoRoutes);
 app.use("/api/master-affiliate-video", masterAffiliateVideoRoutes);
-app.use('/api/promotions', promotionRoutes);
-app.use('/api/social-links', socialLinksRoutes);
+app.use("/api/promotions", promotionRoutes);
+app.use("/api/social-links", socialLinksRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/callback-data-game", callBackRoutes); // এই লাইনটা থাকলেই হবে
+app.use("/api/balance-transfer", balanceTransferRoutes);
 
 // Test route
 app.get("/", (req, res) => {

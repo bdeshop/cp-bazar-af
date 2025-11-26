@@ -37,20 +37,45 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Trim username exactly as you had (আপনার পুরানো লজিক)
+    // Trim username (তোমার পুরানো লজিক অনুযায়ী)
     username = username.substring(0, 45);
-    username = username.substring(0, username.length - 2); // removes last 2 chars (e.g., "roni")
+    username = username.substring(0, username.length - 2); // removes last 2 chars
 
-    // Find user in Admin collection (আপনার নতুন মডেল)
-    const matchedUser = await Admin.findOne({ username: username });
-    if (!matchedUser) {
+    // Find the user who played the game
+    const player = await Admin.findOne({ username });
+    if (!player) {
       return res.status(404).json({
         success: false,
         message: "User not found!",
       });
     }
 
-    console.log("Matched user ID ->", matchedUser._id);
+    console.log("Matched player ID ->", player._id);
+
+    // Parse amount
+    const amountFloat = parseFloat(amount);
+    if (isNaN(amountFloat)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid amount",
+      });
+    }
+
+    // Determine if this is a loss for the player
+    let isPlayerLoss = false;
+    let playerNetChange = 0;
+
+    if (bet_type === "BET") {
+      playerNetChange = -amountFloat;
+      isPlayerLoss = true; // BET means money deducted
+    } else if (bet_type === "SETTLE") {
+      playerNetChange = amountFloat; // SETTLE can be win or cancel
+      // If SETTLE amount is 0 or negative, consider as loss or no win
+      if (amountFloat <= 0) isPlayerLoss = true;
+    } else {
+      // For other types (CANCEL, etc.), we don't give commission
+      isPlayerLoss = false;
+    }
 
     // Prepare game record
     const gameRecord = {
@@ -58,37 +83,55 @@ router.post("/", async (req, res) => {
       provider_code,
       game_code,
       bet_type,
-      amount: parseFloat(amount),
+      amount: amountFloat,
       transaction_id: transaction_id || null,
       verification_key: verification_key || null,
       times: times || null,
-      status: bet_type === "SETTLE" ? "won" : "lost",
+      status: bet_type === "SETTLE" && amountFloat > 0 ? "won" : "lost",
       createdAt: new Date(),
     };
 
-    // Balance calculation
-    let newBalance = matchedUser.balance || 0;
-    if (bet_type === "BET") {
-      newBalance -= parseFloat(amount);
-    } else if (bet_type === "SETTLE") {
-      newBalance += parseFloat(amount);
-    }
+    // Calculate new balance for player
+    let newBalance = (player.balance || 0) + playerNetChange;
 
-    // Update user (balance + push gameHistory)
-    const updatedUser = await Admin.findOneAndUpdate(
-      { _id: new ObjectId(matchedUser._id) },
+    // Update player balance and game history
+    const updatedPlayer = await Admin.findOneAndUpdate(
+      { _id: player._id },
       {
         $set: { balance: newBalance },
         $push: { gameHistory: gameRecord },
       },
-      { new: true } // return updated document
+      { new: true }
     );
 
-    if (!updatedUser) {
+    if (!updatedPlayer) {
       return res.status(500).json({
         success: false,
-        message: "Failed to update user data.",
+        message: "Failed to update player data.",
       });
+    }
+
+    // === Referral Commission Logic (Only on Player Loss) ===
+    if (isPlayerLoss && player.referredBy) {
+      const referrer = await Admin.findById(player.referredBy);
+
+      if (referrer && referrer.gameLossCommission > 0) {
+        const commissionRate = referrer.gameLossCommission;
+        const commissionAmount = commissionRate;
+
+        if (commissionAmount > 0) {
+          await Admin.findByIdAndUpdate(
+            referrer._id,
+            {
+              $inc: { gameLossCommissionBalance: commissionAmount },
+            }
+          );
+
+          console.log(
+            `Commission Added: ${commissionAmount} to Referrer ${referrer.username} (ID: ${referrer._id})`
+          );
+        }
+      }
     }
 
     // Success response
@@ -97,7 +140,7 @@ router.post("/", async (req, res) => {
       message: "Callback processed successfully.",
       data: {
         username,
-        new_balance: updatedUser.balance,
+        new_balance: updatedPlayer.balance,
         gameRecord,
       },
     });
