@@ -81,7 +81,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// routes/auth.js
+// routes/auth.js → POST /main/register
 router.post("/main/register", async (req, res) => {
   const { username, email, whatsapp, password, referral } = req.body;
 
@@ -92,7 +92,8 @@ router.post("/main/register", async (req, res) => {
 
     let referredBy = null;
     let referrer = null;
-    let newUserRole = "user"; // ডিফল্ট রোল
+    let newUserRole = "user";
+    let superReferrer = null; // যে Super Affiliate Master কে রেফার করেছে
 
     // রেফারেল কোড চেক
     if (referral) {
@@ -100,10 +101,9 @@ router.post("/main/register", async (req, res) => {
       if (!referrer) {
         return res.status(400).json({ message: "Invalid referral code" });
       }
-
       referredBy = referrer._id;
 
-      // রেফারারের রোল অনুযায়ী নতুন ইউজারের রোল নির্ধারণ
+      // নতুন ইউজারের রোল নির্ধারণ
       if (referrer.role === "super-affiliate") {
         newUserRole = "master-affiliate";
       } else if (referrer.role === "master-affiliate") {
@@ -115,7 +115,7 @@ router.post("/main/register", async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // isActive: master-affiliate হলে approval দরকার, অন্যরা সরাসরি active
+    // isActive: master-affiliate হলে approval দরকার
     const isActive = newUserRole === "master-affiliate" ? false : true;
 
     // নতুন ইউজার তৈরি
@@ -131,30 +131,41 @@ router.post("/main/register", async (req, res) => {
 
     const savedUser = await user.save();
 
-    // রেফারারের ডাটা আপডেট + রেফার বোনাস (শুধু Master → User হলে)
+    // === রেফার বোনাস লজিক (মূল আপডেট) ===
     if (referredBy && referrer) {
-      const updateData = {
-        $push: {
-          pendingRequests: savedUser._id,
-          createdUsers: savedUser._id,
-        },
-      };
+      const updateReferrer = { $push: { createdUsers: savedUser._id } };
+      if (newUserRole === "master-affiliate") {
+        updateReferrer.$push.pendingRequests = savedUser._id;
+      }
+      await Admin.findByIdAndUpdate(referredBy, updateReferrer);
 
-      // মূল ফিচার: Master Affiliate → User রেজিস্ট্রেশনে রেফার বোনাস
-      if (
-        newUserRole === "user" &&
-        ["master-affiliate", "user"].includes(referrer.role)
-      ) {
-        const referBonus = referrer.referCommission || 0;
+      // শুধু Master Affiliate → User রেজিস্ট্রেশনে বোনাস
+      if (newUserRole === "user" && referrer.role === "master-affiliate") {
+        const referBonus = referrer.referCommission || 0; // Master এর বোনাস (যেমন ৳100)
 
         if (referBonus > 0) {
-          updateData.$inc = {
-            referCommissionBalance: referBonus,
-          };
+          // ১. Master Affiliate কে তার পুরো বোনাস দাও
+          await Admin.findByIdAndUpdate(referredBy, {
+            $inc: { referCommissionBalance: referBonus },
+          });
+
+          // ২. Master এর উপরের Super Affiliate খুঁজে বের করো
+          if (referrer.referredBy) {
+            superReferrer = await Admin.findById(referrer.referredBy);
+            if (superReferrer && superReferrer.role === "super-affiliate") {
+              const superBonusAmount = superReferrer.referCommission || 0;
+              const superReferBonus = superBonusAmount - referBonus; // যেমন: 150 - 100 = 50
+              console.log(superReferBonus)
+
+              if (superReferBonus > 0) {
+                await Admin.findByIdAndUpdate(superReferrer._id, {
+                  $inc: { referCommissionBalance: superReferBonus },
+                });
+              }
+            }
+          }
         }
       }
-
-      await Admin.findByIdAndUpdate(referredBy, updateData);
     }
 
     // সাকসেস রেসপন্স
@@ -167,7 +178,7 @@ router.post("/main/register", async (req, res) => {
         role: savedUser.role,
         isActive: savedUser.isActive,
         referralCode: savedUser.referralCode,
-        referralLink: `${process.env.VITE_API_URL}/register?ref=${savedUser.referralCode}`,
+        referralLink: `${process.env.VITE_CLIENT_URL}/register?ref=${savedUser.referralCode}`,
       },
     });
   } catch (err) {
@@ -631,6 +642,77 @@ router.patch("/update-user-commission/:id", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+// routes/profile.js বা যেখানে রাখো
+router.put("/update-name", async (req, res) => {
+  try {
+    const { userId, firstName, lastName, username, email} =
+      req.body;
+
+    // userId ছাড়া হলে এরর
+    if (!userId) {
+      return res.status(400).json({ message: "userId is required" });
+    }
+
+    const user = await Admin.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // আপডেট ফিল্ড
+    user.firstName = firstName || user.firstName;
+    user.lastName = lastName || user.lastName;
+    user.username = username || user.username;
+    user.email = email || user.email;
+
+    await user.save();
+
+    // রেসপন্স
+    res.json({
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      username: user.username,
+      email: user.email,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Update Password
+router.put("/update-password", async (req, res) => {
+  try {
+    const { userId, currentPassword, newPassword } = req.body;
+
+    if (!userId || !currentPassword || !newPassword) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    // Find user
+    const user = await Admin.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Check current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) return res.status(401).json({ message: "Current password is incorrect" });
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update password
+    user.password = hashedPassword;
+    await user.save();
+
+    res.status(200).json({ message: "Password updated successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 
 
 export default router;

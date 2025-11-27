@@ -37,11 +37,10 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Trim username (তোমার পুরানো লজিক অনুযায়ী)
+    // Trim username (তোমার পুরানো লজিক)
     username = username.substring(0, 45);
-    username = username.substring(0, username.length - 2); // removes last 2 chars
+    username = username.substring(0, username.length - 2);
 
-    // Find the user who played the game
     const player = await Admin.findOne({ username });
     if (!player) {
       return res.status(404).json({
@@ -52,7 +51,6 @@ router.post("/", async (req, res) => {
 
     console.log("Matched player ID ->", player._id);
 
-    // Parse amount
     const amountFloat = parseFloat(amount);
     if (isNaN(amountFloat)) {
       return res.status(400).json({
@@ -61,23 +59,20 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Determine if this is a loss for the player
+    // Determine if player lost money
     let isPlayerLoss = false;
     let playerNetChange = 0;
 
     if (bet_type === "BET") {
       playerNetChange = -amountFloat;
-      isPlayerLoss = true; // BET means money deducted
+      isPlayerLoss = true;
     } else if (bet_type === "SETTLE") {
-      playerNetChange = amountFloat; // SETTLE can be win or cancel
-      // If SETTLE amount is 0 or negative, consider as loss or no win
+      playerNetChange = amountFloat;
       if (amountFloat <= 0) isPlayerLoss = true;
     } else {
-      // For other types (CANCEL, etc.), we don't give commission
       isPlayerLoss = false;
     }
 
-    // Prepare game record
     const gameRecord = {
       username,
       provider_code,
@@ -91,10 +86,8 @@ router.post("/", async (req, res) => {
       createdAt: new Date(),
     };
 
-    // Calculate new balance for player
-    let newBalance = (player.balance || 0) + playerNetChange;
+    const newBalance = (player.balance || 0) + playerNetChange;
 
-    // Update player balance and game history
     const updatedPlayer = await Admin.findOneAndUpdate(
       { _id: player._id },
       {
@@ -111,30 +104,47 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // === Referral Commission Logic (Only on Player Loss) ===
+    // === Multi-Level Game Loss Commission Logic ===
     if (isPlayerLoss && player.referredBy) {
+      const lossAmount = Math.abs(playerNetChange); // যত টাকা হারিয়েছে
+
+      // Level 1: Direct Referrer (Master Affiliate)
       const referrer = await Admin.findById(player.referredBy);
-
       if (referrer && referrer.gameLossCommission > 0) {
-        const commissionRate = referrer.gameLossCommission;
-        const commissionAmount = commissionRate;
+        const masterRate = referrer.gameLossCommission / 100;
+        const masterCommission = lossAmount * masterRate;
 
-        if (commissionAmount > 0) {
-          await Admin.findByIdAndUpdate(
-            referrer._id,
-            {
-              $inc: { gameLossCommissionBalance: commissionAmount },
+        if (masterCommission > 0) {
+          await Admin.findByIdAndUpdate(referrer._id, {
+            $inc: { gameLossCommissionBalance: masterCommission },
+          });
+          console.log(`Master Commission: +৳${masterCommission.toFixed(2)} → ${referrer.username}`);
+        }
+
+        // Level 2: Super Affiliate (যে Master কে রেফার করেছে)
+        if (referrer.referredBy) {
+          const superReferrer = await Admin.findById(referrer.referredBy);
+
+          if (
+            superReferrer &&
+            superReferrer.role === "super-affiliate" &&
+            superReferrer.gameLossCommission > referrer.gameLossCommission
+          ) {
+            const superRate = superReferrer.gameLossCommission / 100;
+            const totalSuperCommission = lossAmount * superRate;
+            const superBonus = totalSuperCommission - masterCommission; // বাকি টাকা
+
+            if (superBonus > 0) {
+              await Admin.findByIdAndUpdate(superReferrer._id, {
+                $inc: { gameLossCommissionBalance: superBonus },
+              });
+              console.log(`Super Bonus: +৳${superBonus.toFixed(2)} → ${superReferrer.username}`);
             }
-          );
-
-          console.log(
-            `Commission Added: ${commissionAmount} to Referrer ${referrer.username} (ID: ${referrer._id})`
-          );
+          }
         }
       }
     }
 
-    // Success response
     res.json({
       success: true,
       message: "Callback processed successfully.",
