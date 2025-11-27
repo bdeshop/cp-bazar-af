@@ -42,9 +42,6 @@ const Register = () => {
     onSuccess: (res) => {
       toast.success("Registration successful!");
       const userData = res.data.user;
-
-      localStorage.setItem("userId", userData.id);
-      setUser(userData);
       queryClient.setQueryData(["user"], userData);
 
       if (userData.isActive) {

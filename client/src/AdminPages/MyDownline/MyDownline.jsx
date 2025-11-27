@@ -65,7 +65,9 @@ const MyDownline = () => {
   const updateUserMutation = useMutation({
     mutationFn: ({ id, username, password }) =>
       axios.patch(
-        `${import.meta.env.VITE_API_URL}/api/update-master-affiliate-credentials/${id}`,
+        `${
+          import.meta.env.VITE_API_URL
+        }/api/update-master-affiliate-credentials/${id}`,
         {
           username,
           password,
@@ -140,7 +142,7 @@ const MyDownline = () => {
     );
 
   const allReferredUsers = [...(data?.createdUsers || [])].filter(Boolean);
-  console.log("Referred Users:", allReferredUsers); 
+  console.log("Referred Users:", allReferredUsers);
 
   return (
     <div
@@ -256,7 +258,7 @@ const MyDownline = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm text-gray-300 mb-1">
-                 Game Loss Commission (%)
+                  Game Loss Commission (%)
                 </label>
                 <input
                   type="number"

@@ -10,7 +10,7 @@ const Sidebar = () => {
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [activeSubDropdown, setActiveSubDropdown] = useState(null);
   const location = useLocation();
-  const { logout, user,refreshBalance, balance } = useContext(AuthContext);
+  const { logout, user, refreshBalance, balance } = useContext(AuthContext);
 
   const handleDropdown = (menu) => {
     setActiveDropdown(activeDropdown === menu ? null : menu);
@@ -28,7 +28,15 @@ const Sidebar = () => {
     { name: "My Report", path: `/affiliate/my-report` },
     { name: "Management", path: `/affiliate/management` },
     { name: "My Refer Link", path: `/affiliate/my-refer-link` },
-    { name: "Withdraw", path: `/affiliate/withdraw` },
+    ...(user?.role === "super-affiliate"
+      ? [{ name: "Add Withdraw Method", path: `/affiliate/withdraw` }]
+      : []),
+      ...(user?.role === "master-affiliate"
+      ? [{ name: "Withdraw Balance", path: `/affiliate/withdraw` }]
+      : []),
+      ...(user?.role === "super-affiliate"
+      ? [{ name: "Withdraw Balance", path: `/affiliate/super-withdraw` }]
+      : []),
     { name: "Profile", path: `/affiliate/profile` },
     { name: "Transaction History", path: `/affiliate/transaction-history` },
     ...(user?.role === "super-affiliate"
@@ -36,6 +44,9 @@ const Sidebar = () => {
       : []),
     ...(user?.role === "super-affiliate"
       ? [{ name: "Banking", path: `/affiliate/banking` }]
+      : []),
+       ...(user?.role === "super-affiliate"
+      ? [{ name: "Withdraw History", path: `/affiliate/withdraw-history` }]
       : []),
   ];
 
@@ -124,7 +135,10 @@ const Sidebar = () => {
               </span>{" "}
               <span className="">{balance}</span>{" "}
             </div>{" "}
-            <button onClick={refreshBalance} className="flex items-center justify-center gap-2 hover:cursor-pointer">
+            <button
+              onClick={refreshBalance}
+              className="flex items-center justify-center gap-2 hover:cursor-pointer"
+            >
               {" "}
               <span className="font-bold py-2 px-4 bg-gray-700 text-[12px]">
                 {" "}

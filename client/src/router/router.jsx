@@ -16,6 +16,8 @@ import Withdraw from "../AdminPages/Withdraw/Withdraw";
 import Banking from "../AdminPages/Banking/Banking";
 import TransactionHistory from "../AdminPages/TransactionHistory/TransactionHistory";
 import WithdrawRequest from "../AdminPages/WithdrawRequest/WithdrawRequest";
+import SuperWithdrawBalance from "../AdminPages/SuperWithdrawBalance/SuperWithdrawBalance";
+import WithdrawHistory from "../AdminPages/WithdrawHistory/WithdrawHistory";
 
 export const routes = createBrowserRouter([
   {
@@ -125,6 +127,22 @@ export const routes = createBrowserRouter([
         element: (
           <PrivateRoute>
             <WithdrawRequest></WithdrawRequest>
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "super-withdraw",
+        element: (
+          <PrivateRoute>
+            <SuperWithdrawBalance></SuperWithdrawBalance>
+          </PrivateRoute>
+        ),
+      },
+      {
+        path: "withdraw-history",
+        element: (
+          <PrivateRoute>
+            <WithdrawHistory></WithdrawHistory>
           </PrivateRoute>
         ),
       },

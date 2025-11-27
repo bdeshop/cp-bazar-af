@@ -7,13 +7,13 @@ export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [userId, setUserId] = useState(null)
+  const [userId, setUserId] = useState(null);
   const [balance, setBalance] = useState(0); // নতুন: ব্যালেন্স
   const [loading, setLoading] = useState(true);
   const [commissionBalance, setCommissionBalance] = useState(0);
   const [referCommissionBalance, setReferCommissionBalance] = useState(0);
   const [gameLossCommissionBalance, setGameLossCommissionBalance] = useState(0);
-  const [depositCommissionBalance,setDepositCommissionBalance] = useState(0)
+  const [depositCommissionBalance, setDepositCommissionBalance] = useState(0);
 
   const { data, refetch } = useQuery({
     queryKey: ["user"],
@@ -24,7 +24,7 @@ export const AuthProvider = ({ children }) => {
         `${import.meta.env.VITE_API_URL}/api/admin?id=${userId}`
       );
       console.log("Fetched user:", res.data.user);
-      setUserId(res.data.user._id)
+      setUserId(res.data.user._id);
 
       return res.data.user;
     },
@@ -64,8 +64,10 @@ export const AuthProvider = ({ children }) => {
         setBalance(fetchedUser.balance || 0);
         setCommissionBalance(fetchedUser.commissionBalance || 0); // কমিশন ব্যালেন্স সেট
         setReferCommissionBalance(fetchedUser.referCommissionBalance || 0); // রেফার কমিশন ব্যালেন্স সেট
-        setGameLossCommissionBalance(fetchedUser.gameLossCommissionBalance || 0)
-        setDepositCommissionBalance(fetchedUser.depositCommissionBalance || 0)
+        setGameLossCommissionBalance(
+          fetchedUser.gameLossCommissionBalance || 0
+        );
+        setDepositCommissionBalance(fetchedUser.depositCommissionBalance || 0);
       }
     } catch (err) {
       console.error("Balance refresh failed:", err);
@@ -96,7 +98,7 @@ export const AuthProvider = ({ children }) => {
         commissionBalance,
         referCommissionBalance,
         gameLossCommissionBalance,
-        depositCommissionBalance
+        depositCommissionBalance,
       }}
     >
       {children}
