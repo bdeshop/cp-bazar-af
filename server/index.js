@@ -25,6 +25,11 @@ import categoryRoutes from "./routes/categoryRoutes.js";
 import callBackRoutes from "./routes/callBackRoutes.js";
 import balanceTransferRoutes from "./routes/balanceTransferRoutes.js";
 import adminWithdrawRoutes from "./routes/adminWithdrawRoutes.js";
+import withdrawPaymentMethodRoutes from './routes/withdrawPaymentMethodRoutes.js';
+import withdrawTransactionRoutes from "./routes/withdrawTransactionRoutes.js";
+
+
+
 
 dotenv.config();
 const app = express();
@@ -63,6 +68,9 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/callback-data-game", callBackRoutes); // এই লাইনটা থাকলেই হবে
 app.use("/api/balance-transfer", balanceTransferRoutes);
 app.use("/api/admin-withdraw", adminWithdrawRoutes);
+app.use('/api/withdraw-payment-methods', withdrawPaymentMethodRoutes);
+app.use("/api/withdraw-transaction", withdrawTransactionRoutes);
+
 
 // Test route
 app.get("/", (req, res) => {
