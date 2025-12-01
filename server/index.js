@@ -25,13 +25,11 @@ import categoryRoutes from "./routes/categoryRoutes.js";
 import callBackRoutes from "./routes/callBackRoutes.js";
 import balanceTransferRoutes from "./routes/balanceTransferRoutes.js";
 import adminWithdrawRoutes from "./routes/adminWithdrawRoutes.js";
-import withdrawPaymentMethodRoutes from './routes/withdrawPaymentMethodRoutes.js';
+import withdrawPaymentMethodRoutes from "./routes/withdrawPaymentMethodRoutes.js";
 import withdrawTransactionRoutes from "./routes/withdrawTransactionRoutes.js";
 import depositPaymentMethodRoutes from "./routes/depositPaymentMethodRoutes.js";
 import depositPaymentTransactionRoutes from "./routes/depositPaymentTransactionRoutes.js";
-
-
-
+import depositBonusRoutes from "./routes/depositBonusRoutes.js";
 
 dotenv.config();
 const app = express();
@@ -70,16 +68,18 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/callback-data-game", callBackRoutes); // এই লাইনটা থাকলেই হবে
 app.use("/api/balance-transfer", balanceTransferRoutes);
 app.use("/api/admin-withdraw", adminWithdrawRoutes);
-app.use('/api/withdraw-payment-methods', withdrawPaymentMethodRoutes);
+app.use("/api/withdraw-payment-methods", withdrawPaymentMethodRoutes);
 app.use("/api/withdraw-transaction", withdrawTransactionRoutes);
 app.use("/api/deposit-payment-method", depositPaymentMethodRoutes);
 app.use("/api/deposit", depositPaymentTransactionRoutes);
+app.use("/api/deposit-bonus", depositBonusRoutes);
 
 
 // Test route
 app.get("/", (req, res) => {
   res.send("Server is running 🚀");
 });
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
