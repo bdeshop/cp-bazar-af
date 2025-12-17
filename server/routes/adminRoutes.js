@@ -393,6 +393,7 @@ router.get("/super-affiliates", async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
 // routes/admin.js
 router.get("/master-affiliates", async (req, res) => {
   try {
@@ -473,6 +474,7 @@ router.post("/create/super-affiliates", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
 // POST: Create New Master Affiliate
 router.post("/create/master-affiliates", async (req, res) => {
   try {
@@ -558,6 +560,49 @@ router.get("/users", async (req, res) => {
     res.json({ users });
   } catch (err) {
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.get("/users/:id", async (req, res) => {
+  try {
+    const user = await Admin.findById(req.params.id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json(user);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.put("/users/:id", async (req, res) => {
+  try {
+    const updates = req.body;
+
+    // Hash password only if provided and not empty
+    if (updates.password && updates.password.trim() !== "") {
+      updates.password = await bcrypt.hash(updates.password, 10);
+    } else {
+      delete updates.password; // Don't update password if blank
+    }
+
+    const updatedUser = await Admin.findByIdAndUpdate(
+      req.params.id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json(updatedUser);
+  } catch (err) {
+    console.error("Update user error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
