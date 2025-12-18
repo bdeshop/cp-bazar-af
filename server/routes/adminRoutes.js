@@ -760,4 +760,118 @@ router.put("/update-password", async (req, res) => {
 
 
 
+
+
+// GET: Fetch all wallets of a user
+router.get("/wallets/:userId", async (req, res) => {
+  try {
+    const user = await Admin.findById(req.params.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, msg: "User not found" });
+    }
+    res.json({ success: true, data: user.wallets });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, msg: "Server error" });
+  }
+});
+
+// POST: Add a new wallet
+router.post("/wallets", async (req, res) => {
+  try {
+    const { userId, methodId, processTab, inputs } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, msg: "userId is required" });
+    }
+
+    const user = await Admin.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, msg: "User not found" });
+    }
+
+    if (user.wallets.length >= 5) {
+      return res.status(400).json({ success: false, msg: "Maximum 5 wallets allowed" });
+    }
+
+    user.wallets.push({
+      methodId,
+      processTab,
+      inputs, // array of { name, value, label, labelBD }
+    });
+
+    await user.save();
+
+    res.json({ success: true, data: user.wallets });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, msg: "Server error" });
+  }
+});
+
+// PUT: Update an existing wallet by wallet _id
+router.put("/wallets/:walletId", async (req, res) => {
+  try {
+    const { userId, methodId, processTab, inputs } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, msg: "userId is required" });
+    }
+
+    const user = await Admin.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, msg: "User not found" });
+    }
+
+    const wallet = user.wallets.id(req.params.walletId);
+    if (!wallet) {
+      return res.status(404).json({ success: false, msg: "Wallet not found" });
+    }
+
+    // Update fields if provided
+    if (methodId !== undefined) wallet.methodId = methodId;
+    if (processTab !== undefined) wallet.processTab = processTab;
+    if (inputs !== undefined) wallet.inputs = inputs;
+
+    await user.save();
+
+    res.json({ success: true, data: user.wallets });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, msg: "Server error" });
+  }
+});
+
+// DELETE: Delete a wallet by wallet _id
+router.delete("/wallets/:walletId", async (req, res) => {
+  try {
+    const { userId } = req.query; // or req.body.userId
+
+    if (!userId) {
+      return res.status(400).json({ success: false, msg: "userId is required" });
+    }
+
+    const user = await Admin.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, msg: "User not found" });
+    }
+
+    const walletIndex = user.wallets.findIndex(
+      (w) => w._id.toString() === req.params.walletId
+    );
+
+    if (walletIndex === -1) {
+      return res.status(404).json({ success: false, msg: "Wallet not found" });
+    }
+
+    user.wallets.splice(walletIndex, 1);
+    await user.save();
+
+    res.json({ success: true, data: user.wallets });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, msg: "Server error" });
+  }
+});
+
 export default router;
