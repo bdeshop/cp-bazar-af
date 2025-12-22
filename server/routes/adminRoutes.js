@@ -1,8 +1,177 @@
 import express from "express";
 import Admin from "../models/Admin.js";
 import bcrypt from "bcryptjs";
+import mongoose from "mongoose";
 
 const router = express.Router();
+
+// Helper: সকল downline user ID পাওয়া (direct + indirect) — শুধু role: "user" গুলোর
+async function getAllDownlineUserIds(affiliateId) {
+  const downlineUserIds = new Set(); // শুধু "user" role এর ID গুলো রাখবো
+
+  async function recurse(currentId) {
+    const user = await Admin.findById(currentId)
+      .select("createdUsers role")
+      .lean();
+
+    if (!user) return;
+
+    // যদি এই নোডটা "user" role হয় → তার ID add করো এবং আর নিচে যাবে না
+    if (user.role === "user") {
+      downlineUserIds.add(currentId.toString());
+      return;
+    }
+
+    // অন্যথায় (super-affiliate বা master-affiliate) → তার createdUsers এর মধ্যে যাও
+    for (const childId of user.createdUsers || []) {
+      const childStr = childId.toString();
+      // ডুপ্লিকেট এড়ানোর জন্য চেক (অপশনাল, কিন্তু ভালো প্র্যাকটিস)
+      if (!downlineUserIds.has(childStr)) {
+        await recurse(childId);
+      }
+    }
+  }
+
+  await recurse(affiliateId);
+  return Array.from(downlineUserIds);
+}
+
+async function getDirectDownline(affiliateId) {
+  const affiliate = await Admin.findById(affiliateId)
+    .select("createdUsers")
+    .populate({
+      path: "createdUsers",
+      select: "username referralCode role balance commissionBalance gameLossCommissionBalance depositCommissionBalance referCommissionBalance createdAt",
+    })
+    .lean();
+
+  return affiliate?.createdUsers || [];
+}
+
+// API: /api/affiliate/stats/BAEAFD  (যেখানে BAEAFD হলো referralCode)
+router.get("/affiliate/stats/:referralCode", async (req, res) => {
+  try {
+    const { referralCode } = req.params;
+
+    const affiliate = await Admin.findOne({
+      referralCode: referralCode.toUpperCase(),
+    }).lean();
+
+    if (!affiliate || !["super-affiliate", "master-affiliate"].includes(affiliate.role)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // এখানে শুধু "user" role এর downline ID গুলো পাবে
+    const downlineUserIds = await getAllDownlineUserIds(affiliate._id);
+
+    if (downlineUserIds.length === 0) {
+      return res.json({
+        todayPlayerWin: 0,
+        todayPlayerLoss: 0,
+        activePlayerCount: 0,
+        totalDownlineBalance: 0,
+      });
+    }
+
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    // শুধু user role এর ডাটা নেওয়া (যেহেতু আমরা শুধু তাদের ID পেয়েছি)
+    const downlineUsers = await Admin.find({
+      _id: { $in: downlineUserIds.map(id => new mongoose.Types.ObjectId(id)) },
+    })
+      .select("balance gameHistory")
+      .lean();
+
+    let todayWin = 0;
+    let todayLoss = 0;
+    let totalBalance = 0;
+
+    downlineUsers.forEach((user) => {
+      totalBalance += user.balance || 0;
+
+      (user.gameHistory || []).forEach((game) => {
+        if (new Date(game.createdAt) >= dayAgo) {
+          if (game.status === "won") todayWin += game.amount || 0;
+          if (game.status === "lost") todayLoss += game.amount || 0;
+        }
+      });
+    });
+
+    res.json({
+      todayPlayerWin: todayWin,
+      todayPlayerLoss: todayLoss,
+      activePlayerCount: downlineUsers.length,
+      totalDownlineBalance: totalBalance,
+    });
+  } catch (error) {
+    console.error("Affiliate stats error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// নতুন API: Downline list with stats
+router.get("/affiliate/downline-list/:referralCode", async (req, res) => {
+  try {
+    const { referralCode } = req.params;
+
+    const affiliate = await Admin.findOne({
+      referralCode: referralCode.toUpperCase(),
+    }).lean();
+
+    if (!affiliate || !["super-affiliate", "master-affiliate"].includes(affiliate.role)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const directDownline = await getDirectDownline(affiliate._id);
+
+    if (directDownline.length === 0) {
+      return res.json({
+        downline: [],
+        totalDownline: 0,
+        totalBalance: 0,
+        totalCommission: 0,
+      });
+    }
+
+    // Summary calculation
+    let totalBalance = 0;
+    let totalCommission = 0;
+    let totalDownlineCount = directDownline.length;
+
+    const downlineList = directDownline.map((user) => {
+      const userBalance = user.balance || 0;
+      const userCommission =
+        (user.gameLossCommissionBalance || 0) +
+        (user.depositCommissionBalance || 0) +
+        (user.referCommissionBalance || 0);
+
+      totalBalance += userBalance;
+      totalCommission += userCommission;
+
+      return {
+        _id: user._id,
+        username: user.username,
+        referralCode: user.referralCode,
+        role: user.role,
+        balance: userBalance,
+        totalCommission: userCommission,
+        createdAt: user.createdAt,
+      };
+    });
+
+    res.json({
+      downline: downlineList,
+      summary: {
+        totalDownline: totalDownlineCount,
+        totalBalance,
+        totalCommission,
+      },
+    });
+  } catch (error) {
+    console.error("Downline list error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 // POST /register
 router.post("/register", async (req, res) => {
@@ -757,9 +926,6 @@ router.put("/update-password", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
-
-
 
 
 // GET: Fetch all wallets of a user
